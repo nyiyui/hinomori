@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -eu
+
+image="$1"
+path="$2"
+container="hinomori-make-wire"
+make_wire_path="./make-wire"
+
+container=$(docker create -it "$image")
+docker start "$container"
+docker cp "$make_wire_path" "$container:/root/make-wire"
+docker exec --workdir /root "$container" /root/make-wire \
+	> $path
+# TODO: use mktmp
+docker kill "$container"
+docker rm "$container"

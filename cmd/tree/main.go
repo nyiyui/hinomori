@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -9,10 +11,12 @@ import (
 )
 
 func main() {
+	var count int
 	ch := make(chan wire.FileInfo2)
 	go func() {
 		for file := range ch {
 			fmt.Printf("%s\n", &file)
+			count++
 		}
 	}()
 	var b [4]byte
@@ -25,6 +29,11 @@ func main() {
 	}
 	err = wire.DecodeWire(os.Stdin, ch)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			log.Print("EOF")
+			log.Printf("read %d files", count)
+			return
+		}
 		log.Fatal(err)
 	}
 }

@@ -1,0 +1,12 @@
+#!/bin/sh
+
+images="$@"
+
+for image in $images
+do
+	path="./wire-docker-$image.hino"
+	log_path="./wire-docker-$image.log"
+	./make-wire-docker "$image" "$path" >> "$log_path" 2>&1 &
+done
+
+wait
