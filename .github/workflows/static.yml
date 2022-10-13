@@ -36,10 +36,8 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-      - name: Test
-        run: go test -v ./...
       - name: Build
-        run: go build -v ./cmd/make-wire/main.go
+        run: go build -v ./cmd/make-wire
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
