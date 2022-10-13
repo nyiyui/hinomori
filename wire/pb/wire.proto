@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+option go_package = "github.com/nyiyui/hinomori/wire/pb";
+
+package wire;
+
+message Step {
+  oneof step {
+    StepFile file = 1;
+    StepPathUp up = 2;
+    StepPathDown down = 3;
+  }
+}
+
+message StepFile {
+  uint32 mode = 1;
+  uint64 size = 2;
+  string name = 3;
+  bytes hash = 4;
+  string hashErr = 5;
+}
+
+message StepPathUp {
+  uint32 up = 1;
+}
+
+message StepPathDown {
+  string down = 1;
+}

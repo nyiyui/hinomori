@@ -9,29 +9,33 @@ import (
 	"path/filepath"
 
 	"github.com/nyiyui/opt/hinomori/wire"
+	"github.com/nyiyui/opt/hinomori/wire/pb"
 )
 
 func main() {
 	var count int
-	ch := make(chan wire.FileInfo2)
+	stepCh := make(chan *pb.Step)
+	fiCh := make(chan wire.FileInfo2)
+	errCh := make(chan error)
+	// DecodeSteps -[stepCh]> ConvertSteps -[fiCh]> fmt.Printf
+	//                                     -[errCh]> log.Printf
 	go func() {
-		for f := range ch {
+		wire.ConvertSteps(stepCh, fiCh, errCh)
+	}()
+	go func() {
+		for err := range errCh {
+			log.Printf("convert: %s", err)
+		}
+	}()
+	go func() {
+		for f := range fiCh {
 			fmt.Printf("%11s %8d %16x %s\n", f.Mode, f.Size, f.Hash, filepath.Join(f.Path, f.Name))
 			count++
 		}
 	}()
-	var b [4]byte
-	_, err := os.Stdin.Read(b[:])
-	if err != nil {
-		log.Fatal(err)
-	}
-	if string(b[:]) != wire.WireMagic {
-		log.Fatal("no magic")
-	}
-	err = wire.DecodeWire(os.Stdin, ch)
+	err := wire.DecodeSteps(os.Stdin, stepCh)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			log.Print("EOF")
 			log.Printf("read %d files", count)
 			return
 		}

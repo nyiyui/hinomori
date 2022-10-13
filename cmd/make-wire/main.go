@@ -38,18 +38,18 @@ func main() {
 		walker.Block(paths2)
 	}
 
-	ch := make(chan wire.FileInfo)
+	ch := make(chan wire.WalkStep)
 	go func() {
-		err := walker.Walk(root, ch)
+		err := walker.Walk2(root, ch)
 		if err != nil {
 			log.Fatalf("walk: %s", err)
 		}
 	}()
 	fmt.Fprintf(os.Stdout, wire.WireMagic)
-	for file := range ch {
-		err := wire.EncodeWire(os.Stdout, file)
+	for step := range ch {
+		err := wire.EncodeStep(os.Stdout, &step.Step)
 		if err != nil {
-			log.Printf("%s: %s", file.AbsPath, err)
+			log.Printf("%s: %s", step.AbsPath, err)
 		}
 	}
 }
