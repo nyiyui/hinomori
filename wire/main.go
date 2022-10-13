@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/exp/constraints"
@@ -22,6 +23,8 @@ type FileInfo struct {
 	Info    fs.FileInfo
 	up      uint32
 	down    string
+	hash    []byte
+	hashErr error
 }
 
 type FileInfo2 struct {
@@ -29,11 +32,12 @@ type FileInfo2 struct {
 	Size uint64
 	Name string
 	Path string
+	Hash []byte
 }
 
 func (f *FileInfo2) String() string {
 	b := new(strings.Builder)
-	fmt.Fprintf(b, "%s %d %s %s", f.Mode, f.Size, f.Path, f.Name)
+	fmt.Fprintf(b, "%s %d %16x %s %s", f.Mode, f.Size, f.Hash, f.Path, f.Name)
 	return b.String()
 }
 
@@ -80,7 +84,22 @@ func EncodeWire(w io.Writer, fi FileInfo) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(w, name)
+		_, err = fmt.Fprint(w, name)
+		if err != nil {
+			return err
+		}
+	}
+	var b [4]byte
+	binary.LittleEndian.PutUint32(b[:], uint32(len(fi.hash)))
+	_, err := w.Write(b[:])
+	if err != nil {
+		return err
+	}
+	if len(fi.hash) != 0 {
+		_, err = fmt.Fprint(w, string(fi.hash))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -148,6 +167,20 @@ func decodeWireFile(r io.Reader, fi *FileInfo2) error {
 		return err
 	}
 	fi.Name = string(name)
+	{
+		var b [4]byte
+		_, err := r.Read(b[:])
+		if err != nil {
+			return err
+		}
+		hashSize := binary.LittleEndian.Uint32(b[:])
+		hash := make([]byte, hashSize)
+		_, err = r.Read(hash)
+		if err != nil {
+			return err
+		}
+		fi.Hash = hash
+	}
 	return nil
 }
 
@@ -180,7 +213,6 @@ func common[T comparable](a, b []T) int {
 		if i >= ln {
 			return i
 		}
-		log.Printf("if %d %v %v", i, a, b)
 		if a[i] != b[i] {
 			return i
 		}
@@ -188,18 +220,44 @@ func common[T comparable](a, b []T) int {
 	return ln
 }
 
-func Walk(path string, files chan<- FileInfo) error {
+type Walker struct {
+	blockedPaths []*regexp.Regexp
+	hash         bool
+}
+
+var defaultBlockedPaths = []*regexp.Regexp{
+	regexp.MustCompile("^/dev.*"),
+	// /dev/console, /dev/stdin, /dev/u?random, etc
+	regexp.MustCompile("^/proc.*"),
+}
+
+// NewWalker returns a new Walker with sane default.
+func NewWalker() *Walker {
+	w := new(Walker)
+	w.Block(defaultBlockedPaths)
+	return w
+}
+
+func (w *Walker) Block(paths []*regexp.Regexp) {
+	w.blockedPaths = append(w.blockedPaths, paths...)
+}
+
+func (w *Walker) isBlocked(path string) bool {
+	for _, blocked := range w.blockedPaths {
+		if blocked.Match([]byte(path)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (w *Walker) Walk(path string, files chan<- FileInfo) error {
 	defer close(files)
-	//path, err := filepath.Abs(path)
-	//if err != nil {
-	//	return err
-	//}
 	var q deque.Deque[qItem]
 	q.PushBack(qItem{Name: path})
 	var prevName string
 	for q.Len() != 0 {
 		item := q.PopFront()
-		log.Printf("qItem %#v", item)
 		entries, err := ioutil.ReadDir(item.Name)
 		if err != nil {
 			return err
@@ -207,7 +265,6 @@ func Walk(path string, files chan<- FileInfo) error {
 		var up uint32
 		var down string
 		if prevName != item.Name {
-			log.Printf("down %s %s", prevName, item.Name)
 			a := strings.Split(prevName, string(os.PathSeparator))
 			if len(a) == 1 && a[0] == "" {
 				a = []string{}
@@ -217,13 +274,8 @@ func Walk(path string, files chan<- FileInfo) error {
 				b = []string{}
 			}
 			lc := common(a, b)
-			log.Printf("common %d %s", len(a[:lc]), a[:lc])
-			log.Printf("uncommonA %d %s", len(a[lc:]), a[lc:])
-			log.Printf("uncommonB %d %s", len(b[lc:]), b[lc:])
 			down = strings.Join(b[lc:], string(os.PathSeparator))
 			up = uint32(len(a[lc:]))
-			log.Printf("up %d", up)
-			log.Printf("down %s", down)
 		}
 		for i, entry := range entries {
 			name := filepath.Join(item.Name, entry.Name())
@@ -231,23 +283,36 @@ func Walk(path string, files chan<- FileInfo) error {
 				AbsPath: name,
 				Info:    entry,
 			}
+			if w.isBlocked(name) {
+				continue
+			}
+			if w.hash && safeMode(entry.Mode()) {
+				fi.hash, err = w.makeHash(name)
+				if err != nil {
+					fi.hashErr = err
+					log.Printf("hash %s: %s", name, err)
+				}
+			}
 			if i == 0 {
 				if up != 0 {
 					fi.up = up
+					log.Printf("up %s", item.Name)
 				}
 				if down != "" {
 					fi.down = down
 				}
 			}
 			files <- fi
-			log.Printf("files %#v", fi)
-			//log.Printf("i %d len %d", i, len(entries))
 			if entry.IsDir() {
-				//q.PushBack(qItem{Down: entry.Name(), DownCount: item.DownCount + 1, Name: name})
 				q.PushBack(qItem{Name: name})
 			}
 		}
 		prevName = item.Name
 	}
 	return nil
+}
+
+func safeMode(mode fs.FileMode) bool {
+	return !mode.IsDir() &&
+		!(mode&(fs.ModeDevice|fs.ModeNamedPipe|fs.ModeSocket|fs.ModeIrregular) == 0)
 }

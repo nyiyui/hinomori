@@ -1,0 +1,15 @@
+#!/bin/sh
+
+images="$@"
+
+MAKE_WIRE="${MAKE_WIRE:-./make-wire-docker}"
+
+for image in $images
+do
+	path="./wire-$image.hino"
+	log_path="./wire-$image.log"
+	$MAKE_WIRE "$image" "$path"
+#>> "$log_path" 2>&1 &
+done
+
+wait

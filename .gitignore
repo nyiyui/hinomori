@@ -1,1 +1,3 @@
-./wire-docker-*
+/wire-docker-*
+/make-wire
+/tree

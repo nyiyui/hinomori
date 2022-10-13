@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/nyiyui/opt/hinomori/wire"
 )
@@ -14,8 +15,8 @@ func main() {
 	var count int
 	ch := make(chan wire.FileInfo2)
 	go func() {
-		for file := range ch {
-			fmt.Printf("%s\n", &file)
+		for f := range ch {
+			fmt.Printf("%11s %8d %16x %s\n", f.Mode, f.Size, f.Hash, filepath.Join(f.Path, f.Name))
 			count++
 		}
 	}()

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -eux
+
+image="$1"
+path="$2"
+container="hinomori-make-wire"
+make_wire_path="./make-wire"
+
+block='["/sys/devices", "/proc", "/sys"]'
+
+name=hinomori-make-wire
+multipass launch "$image" -n "$name"
+multipass transfer "$make_wire_path" "$name:/home/ubuntu/make-wire"
+multipass exec "$name" -- chmod a+x /home/ubuntu/make-wire
+multipass exec "$name" -- sudo /home/ubuntu/make-wire -hash -block "$block" \
+	> $path
+multipass stop "$name"
+multipass delete "$name"
+echo 'NOTE: Remember to multipass purge; this script will not as it may delete other instances.' 
