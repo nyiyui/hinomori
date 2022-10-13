@@ -28,7 +28,7 @@ func (w *Walker) makeHash(path string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stat: %w", err)
 	}
-	if info.IsDir() {
+	if !info.Mode().IsRegular() {
 		return nil, nil
 	}
 	digest := xxhash.New()
