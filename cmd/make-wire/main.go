@@ -48,12 +48,7 @@ func main() {
 	}
 
 	ch := make(chan *wire.WalkStep)
-	go func() {
-		err := walker.Walk2(root, ch)
-		if err != nil {
-			log.Fatalf("walk: %s", err)
-		}
-	}()
+	go walker.Walk2(root, ch)
 	out := bufio.NewWriter(os.Stdout)
 	_, err := fmt.Fprintf(out, wire.WireMagic)
 	if err != nil {

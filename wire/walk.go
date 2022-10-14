@@ -17,8 +17,67 @@ type WalkStep struct {
 	AbsPath string
 }
 
-func (w *Walker) Walk2(path string, steps chan<- *WalkStep) error {
-	defer close(steps)
+type stepRes struct {
+	File    bool
+	Mode    fs.FileMode
+	Size    int64
+	Name    string
+	Hash    []byte
+	HashErr string
+	AbsPath string
+
+	Up uint32
+
+	Down string
+}
+
+func (w *Walker) Walk2(path string, steps chan<- *WalkStep) {
+	stepRess := make(chan stepRes)
+	go w.walk2(path, stepRess)
+	for res := range stepRess {
+		if res.Up != 0 {
+			steps <- &WalkStep{
+				Step: pb.Step{
+					Step: &pb.Step_Up{
+						Up: &pb.StepPathUp{
+							Up: res.Up,
+						},
+					},
+				},
+			}
+		}
+		if res.Down != "" {
+			steps <- &WalkStep{
+				Step: pb.Step{
+					Step: &pb.Step_Down{
+						Down: &pb.StepPathDown{
+							Down: res.Down,
+						},
+					},
+				},
+			}
+		}
+		if res.File {
+			steps <- &WalkStep{
+				Step: pb.Step{
+					Step: &pb.Step_File{
+						File: &pb.StepFile{
+							Mode:    uint32(res.Mode),
+							Size:    uint64(res.Size),
+							Name:    res.Name,
+							Hash:    res.Hash,
+							HashErr: res.HashErr,
+						},
+					},
+				},
+				AbsPath: res.Name,
+			}
+		}
+	}
+}
+
+func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
+	defer close(stepRess)
 	var q deque.Deque[qItem]
 	q.PushBack(qItem{Name: path})
 	var prevName string
@@ -85,118 +144,26 @@ func (w *Walker) Walk2(path string, steps chan<- *WalkStep) error {
 						log.Printf("hash %s: %s", name, hashErr)
 					}
 				}
-				steps <- &WalkStep{
-					Step: pb.Step{
-						Step: &pb.Step_File{
-							File: &pb.StepFile{
-								Mode:    uint32(info.Mode()),
-								Size:    uint64(info.Size()),
-								Name:    entry.Name(),
-								Hash:    hash,
-								HashErr: fmt.Sprint(hashErr),
-							},
-						},
-					},
+				res := stepRes{
+					File:    true,
+					Mode:    info.Mode(),
+					Size:    info.Size(),
+					Name:    entry.Name(),
+					Hash:    hash,
+					HashErr: fmt.Sprint(hashErr),
 					AbsPath: name,
 				}
 				if i == 0 {
 					if up != 0 {
-						steps <- &WalkStep{
-							Step: pb.Step{
-								Step: &pb.Step_Up{
-									Up: &pb.StepPathUp{
-										Up: up,
-									},
-								},
-							},
-						}
+						res.Up = up
 					}
 					if down != "" {
-						steps <- &WalkStep{
-							Step: pb.Step{
-								Step: &pb.Step_Down{
-									Down: &pb.StepPathDown{
-										Down: down,
-									},
-								},
-							},
-						}
+						res.Down = down
 					}
 				}
+				stepRess <- res
 			}(i, entry)
 		}
 		prevName = item.Name
-	}
-	return nil
-}
-
-type qItem2 struct {
-	Name string
-}
-
-type scanRes struct {
-	Mode    fs.FileMode
-	Size    int64
-	Name    string
-	Hash    []byte
-	HashErr string
-
-	AbsPath string
-}
-
-type walk2ScanState struct {
-	q     chan qItem2
-	steps chan<- scanRes
-}
-
-// TODO: concurrent scan
-
-func (w *Walker) walk2Scan(s *walk2ScanState) {
-	for item := range s.q {
-		/*
-			counter++
-			if counter == showCounterNext {
-				log.Printf("progress: %d of current %d", counter, s.q.Len())
-				showCounterNext *= 2
-				showCounterNext = min(16384, showCounterNext)
-			}
-		*/
-		entries, err := os.ReadDir(item.Name)
-		if err != nil {
-			log.Printf("read %s: %s", item.Name, err)
-		}
-		for _, entry := range entries {
-			name := filepath.Join(item.Name, entry.Name())
-			if w.isBlocked(name) {
-				continue
-			}
-			info, err := entry.Info()
-			if err != nil {
-				log.Printf("info %s: %s", name, err)
-				continue
-			}
-			if !(entry.IsDir() || info.Mode().IsRegular()) {
-				continue
-			}
-			var hash []byte
-			var hashErr error
-			if w.hash && safeMode(info.Mode()) {
-				hash, hashErr = w.makeHash(name)
-				if hashErr != nil {
-					log.Printf("hash %s: %s", name, hashErr)
-				}
-			}
-			s.steps <- scanRes{
-				Mode:    info.Mode(),
-				Size:    info.Size(),
-				Name:    entry.Name(),
-				Hash:    hash,
-				HashErr: fmt.Sprint(hashErr),
-				AbsPath: name,
-			}
-			if entry.IsDir() {
-				s.q <- qItem2{Name: name}
-			}
-		}
 	}
 }
