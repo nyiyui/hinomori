@@ -12,6 +12,8 @@ import (
 	"github.com/nyiyui/opt/hinomori/wire/pb"
 )
 
+const counterCutoff = 65536
+
 type WalkStep struct {
 	Step    pb.Step
 	AbsPath string
@@ -87,10 +89,10 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 		counter++
 		if counter == showCounterNext {
 			log.Printf("progress: %d of current %d", counter, q.Len())
-			if showCounterNext < 16384 {
+			if showCounterNext < counterCutoff {
 				showCounterNext *= 2
 			} else {
-				showCounterNext += 16384
+				showCounterNext += counterCutoff
 			}
 		}
 		item := q.PopFront()
