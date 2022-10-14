@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/gammazero/deque"
 	"github.com/nyiyui/opt/hinomori/wire/pb"
@@ -29,6 +30,8 @@ type stepRes struct {
 	Hash    []byte
 	HashErr string
 	AbsPath string
+	Owner   uint32
+	Group   uint32
 
 	Up uint32
 
@@ -72,6 +75,8 @@ func (w *Walker) Walk2(path string, out io.Writer) error {
 						Name:    res.Name,
 						Hash:    res.Hash,
 						HashErr: res.HashErr,
+						Own:     res.Owner,
+						Grp:     res.Group,
 					},
 				},
 			})
@@ -197,6 +202,12 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 						Hash:    hash,
 						HashErr: hashErr2,
 						AbsPath: name,
+					}
+					sys := info.Sys()
+					switch sys := sys.(type) {
+					case *syscall.Stat_t:
+						res.Owner = sys.Uid
+						res.Group = sys.Gid
 					}
 					stepRess <- res
 				}(i, entry)

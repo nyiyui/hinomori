@@ -23,16 +23,18 @@ type FileInfo struct {
 }
 
 type FileInfo2 struct {
-	Mode fs.FileMode
-	Size uint64
-	Name string
-	Path string
-	Hash []byte
+	Mode  fs.FileMode
+	Size  uint64
+	Name  string
+	Path  string
+	Hash  []byte
+	Owner uint32
+	Group uint32
 }
 
 func (f *FileInfo2) String() string {
 	b := new(strings.Builder)
-	fmt.Fprintf(b, "%s %d %16x %s %s", f.Mode, f.Size, f.Hash, f.Path, f.Name)
+	fmt.Fprintf(b, "%s %d %d %d %16x %s %s", f.Mode, f.Owner, f.Group, f.Size, f.Hash, f.Path, f.Name)
 	return b.String()
 }
 

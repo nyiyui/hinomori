@@ -42,8 +42,9 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+	fmt.Printf("%11s %8s %6s %6s %16s %s\n", "mode", "size", "own", "grp", "hash", "path")
 	for f := range fiCh {
-		fmt.Printf("%11s %8d %16x %s\n", f.Mode, f.Size, f.Hash, filepath.Join(f.Path, f.Name))
+		fmt.Printf("%11s %8d %6d %6d %16x %s\n", f.Mode, f.Size, f.Owner, f.Group, f.Hash, filepath.Join(f.Path, f.Name))
 		count++
 	}
 }

@@ -84,11 +84,13 @@ func ConvertSteps(in <-chan *pb.Step, out chan<- FileInfo2, errs chan<- error) {
 		case *pb.Step_File:
 			f := stepIn.File
 			fi := FileInfo2{
-				Mode: fs.FileMode(f.Mode),
-				Size: f.Size,
-				Name: f.Name,
-				Path: currentPath,
-				Hash: f.Hash,
+				Mode:  fs.FileMode(f.Mode),
+				Size:  f.Size,
+				Name:  f.Name,
+				Path:  currentPath,
+				Hash:  f.Hash,
+				Owner: f.Own,
+				Group: f.Grp,
 			}
 			out <- fi
 		case *pb.Step_Up:

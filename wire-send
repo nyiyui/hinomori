@@ -1,0 +1,4 @@
+#!/bin/bash
+
+./make-wire -hash-all -post-hash -block '["/tmp"]' > all.hino \
+	| ./yusen -name 'wire' -src-stdin

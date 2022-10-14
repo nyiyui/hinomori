@@ -14,6 +14,8 @@ message Step {
 
 message StepFile {
   uint32 mode = 1;
+  uint32 own = 6;
+  uint32 grp = 7;
   uint64 size = 2;
   string name = 3;
   bytes hash = 4;
