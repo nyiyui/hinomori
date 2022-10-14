@@ -152,11 +152,16 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 				}
 				var hash []byte
 				var hashErr error
-				if w.hash && safeMode(info.Mode()) && info.Size() != 0 && (w.hashPaths == nil || w.isHashPath(name)) {
+				if w.hash && safeMode(info.Mode()) && info.Size() != 0 && (len(w.hashPaths) == 0 || w.isHashPath(name)) {
 					hash, hashErr = w.makeHash(name)
 					if hashErr != nil {
 						log.Printf("hash %s: %s", name, hashErr)
 					}
+				}
+				hashErr2 := ""
+				if hashErr != nil {
+					hashErr2 = hashErr.Error()
+					// no recover but should be fine enough
 				}
 				res := stepRes{
 					File:    true,
@@ -164,7 +169,7 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 					Size:    info.Size(),
 					Name:    entry.Name(),
 					Hash:    hash,
-					HashErr: fmt.Sprint(hashErr),
+					HashErr: hashErr2,
 					AbsPath: name,
 				}
 				if i == 0 {
