@@ -226,6 +226,7 @@ func common[T comparable](a, b []T) int {
 
 type Walker struct {
 	blockedPaths []*regexp.Regexp
+	hashPaths    []*regexp.Regexp
 	hash         bool
 }
 
@@ -246,9 +247,26 @@ func (w *Walker) Block(paths []*regexp.Regexp) {
 	w.blockedPaths = append(w.blockedPaths, paths...)
 }
 
+func (w *Walker) HashAll(hash bool) {
+	w.hash = hash
+}
+
+func (w *Walker) Hash(paths []*regexp.Regexp) {
+	w.hashPaths = append(w.hashPaths, paths...)
+}
+
 func (w *Walker) isBlocked(path string) bool {
 	for _, blocked := range w.blockedPaths {
 		if blocked.Match([]byte(path)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (w *Walker) isHashPath(path string) bool {
+	for _, path2 := range w.hashPaths {
+		if path2.Match([]byte(path)) {
 			return true
 		}
 	}

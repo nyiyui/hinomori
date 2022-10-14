@@ -120,6 +120,7 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 			names[i] = name
 			if entry.IsDir() {
 				q.PushBack(qItem{Name: names[i]})
+				log.Printf("push back len %d", q.Len())
 			}
 		}
 		for i, entry := range entries {
@@ -138,7 +139,7 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 				}
 				var hash []byte
 				var hashErr error
-				if w.hash && safeMode(info.Mode()) {
+				if w.hash && safeMode(info.Mode()) && (w.hashPaths == nil || w.isHashPath(name)) {
 					hash, hashErr = w.makeHash(name)
 					if hashErr != nil {
 						log.Printf("hash %s: %s", name, hashErr)

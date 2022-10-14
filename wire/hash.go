@@ -9,10 +9,6 @@ import (
 	"github.com/cespare/xxhash"
 )
 
-func (w *Walker) Hash(hash bool) {
-	w.hash = hash
-}
-
 func (w *Walker) makeHash(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {

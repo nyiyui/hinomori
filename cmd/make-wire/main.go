@@ -14,14 +14,32 @@ import (
 	"github.com/nyiyui/opt/hinomori/wire"
 )
 
+func jsonPaths(s string) ([]*regexp.Regexp, error) {
+	paths := make([]string, 0)
+	err := json.Unmarshal([]byte(s), &paths)
+	if err != nil {
+		return nil, err
+	}
+	paths2 := make([]*regexp.Regexp, len(paths))
+	for i, path := range paths {
+		paths2[i], err = regexp.Compile(path)
+		if err != nil {
+			return nil, fmt.Errorf("path %d: %w", i, err)
+		}
+	}
+	return paths2, nil
+}
+
 func main() {
 	var root string
 	var block string
-	var hash bool
+	var hashAll bool
+	var hash string
 	var prof bool
 	flag.StringVar(&root, "root", "/", "root of tree")
 	flag.StringVar(&block, "block", "[]", "paths to block in JSON")
-	flag.BoolVar(&hash, "hash", false, "hash all files")
+	flag.BoolVar(&hashAll, "hash-all", false, "hash all files")
+	flag.StringVar(&hash, "hash", "[]", "paths to hash in JSON")
 	flag.BoolVar(&prof, "prof", false, "enable profiling")
 	flag.Parse()
 
@@ -30,22 +48,17 @@ func main() {
 	}
 
 	walker := wire.NewWalker()
-	walker.Hash(hash)
-	{
-		paths := make([]string, 0)
-		err := json.Unmarshal([]byte(block), &paths)
-		if err != nil {
-			log.Fatal(err)
-		}
-		paths2 := make([]*regexp.Regexp, len(paths))
-		for i, path := range paths {
-			paths2[i], err = regexp.Compile(path)
-			if err != nil {
-				log.Fatalf("path %d: %s", i, err)
-			}
-		}
-		walker.Block(paths2)
+	walker.HashAll(hash)
+	paths, err := jsonPaths(hash)
+	if err != nil {
+		log.Fatal(err)
 	}
+	walker.Hash(paths)
+	paths, err = jsonPaths(block)
+	if err != nil {
+		log.Fatal(err)
+	}
+	walker.Block(paths)
 
 	ch := make(chan *wire.WalkStep)
 	go walker.Walk2(root, ch)
