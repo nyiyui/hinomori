@@ -48,22 +48,22 @@ func main() {
 	}
 
 	walker := wire.NewWalker()
-	walker.HashAll(hash)
+	walker.HashAll(hashAll)
 	paths, err := jsonPaths(hash)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("hash paths: %s", err)
 	}
 	walker.Hash(paths)
 	paths, err = jsonPaths(block)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("block paths: %s", err)
 	}
 	walker.Block(paths)
 
 	ch := make(chan *wire.WalkStep)
 	go walker.Walk2(root, ch)
 	out := bufio.NewWriter(os.Stdout)
-	_, err := fmt.Fprintf(out, wire.WireMagic)
+	_, err = fmt.Fprintf(out, wire.WireMagic)
 	if err != nil {
 		log.Printf("writing magic: %s", err)
 	}

@@ -1,3 +1,5 @@
 /wire-docker-*
 /make-wire
 /tree
+profile*.svg
+*.pprof

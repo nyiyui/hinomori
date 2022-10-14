@@ -89,6 +89,8 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 			log.Printf("progress: %d of current %d", counter, q.Len())
 			if showCounterNext < 16384 {
 				showCounterNext *= 2
+			} else {
+				showCounterNext += 16384
 			}
 		}
 		item := q.PopFront()
@@ -120,7 +122,6 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 			names[i] = name
 			if entry.IsDir() {
 				q.PushBack(qItem{Name: names[i]})
-				log.Printf("push back len %d", q.Len())
 			}
 		}
 		for i, entry := range entries {
