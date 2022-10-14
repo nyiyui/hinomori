@@ -67,6 +67,7 @@ func main() {
 	if err != nil {
 		log.Printf("writing magic: %s", err)
 	}
+	defer out.Flush()
 	err = walker.Walk2(root, out)
 	if err != nil {
 		log.Fatalf("walk: %s", err)

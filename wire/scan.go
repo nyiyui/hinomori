@@ -58,12 +58,14 @@ func (w *Walker) walk2Scan(s *walk2ScanState) {
 			}
 			var hash []byte
 			var hashErr error
-			if w.hash && safeMode(info.Mode()) {
-				hash, hashErr = w.makeHash(name)
-				if hashErr != nil {
-					log.Printf("hash %s: %s", name, hashErr)
+			/*
+				if w.hash && safeMode(info.Mode()) {
+					hash, hashErr = w.makeHash(name)
+					if hashErr != nil {
+						log.Printf("hash %s: %s", name, hashErr)
+					}
 				}
-			}
+			*/
 			s.steps <- scanRes{
 				Mode:    info.Mode(),
 				Size:    info.Size(),

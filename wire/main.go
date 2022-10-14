@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
-	"log"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"golang.org/x/exp/constraints"
-
-	"github.com/gammazero/deque"
 )
 
 type FileInfo struct {
@@ -185,6 +180,7 @@ func decodeWireFile(r io.Reader, fi *FileInfo2) error {
 }
 
 type qItem struct {
+	First     bool
 	End       bool
 	Down      string
 	DownCount int
@@ -227,7 +223,7 @@ func common[T comparable](a, b []T) int {
 type Walker struct {
 	blockedPaths []*regexp.Regexp
 	hashPaths    []*regexp.Regexp
-	hash         bool
+	hashAll      bool
 }
 
 var defaultBlockedPaths = []*regexp.Regexp{
@@ -247,8 +243,8 @@ func (w *Walker) Block(paths []*regexp.Regexp) {
 	w.blockedPaths = append(w.blockedPaths, paths...)
 }
 
-func (w *Walker) HashAll(hash bool) {
-	w.hash = hash
+func (w *Walker) HashAll(hashAll bool) {
+	w.hashAll = hashAll
 }
 
 func (w *Walker) Hash(paths []*regexp.Regexp) {
@@ -271,70 +267,4 @@ func (w *Walker) isHashPath(path string) bool {
 		}
 	}
 	return false
-}
-
-func (w *Walker) Walk(path string, files chan<- FileInfo) error {
-	defer close(files)
-	var q deque.Deque[qItem]
-	q.PushBack(qItem{Name: path})
-	var prevName string
-	for q.Len() != 0 {
-		item := q.PopFront()
-		entries, err := ioutil.ReadDir(item.Name)
-		if err != nil {
-			return err
-		}
-		var up uint32
-		var down string
-		if prevName != item.Name {
-			a := strings.Split(prevName, string(os.PathSeparator))
-			if len(a) == 1 && a[0] == "" {
-				a = []string{}
-			}
-			b := strings.Split(item.Name, string(os.PathSeparator))
-			if len(b) == 1 && b[0] == "" {
-				b = []string{}
-			}
-			lc := common(a, b)
-			down = strings.Join(b[lc:], string(os.PathSeparator))
-			up = uint32(len(a[lc:]))
-		}
-		for i, entry := range entries {
-			name := filepath.Join(item.Name, entry.Name())
-			fi := FileInfo{
-				AbsPath: name,
-				Info:    entry,
-			}
-			if w.isBlocked(name) {
-				continue
-			}
-			if w.hash && safeMode(entry.Mode()) {
-				fi.hash, err = w.makeHash(name)
-				if err != nil {
-					fi.hashErr = err
-					log.Printf("hash %s: %s", name, err)
-				}
-			}
-			if i == 0 {
-				if up != 0 {
-					fi.up = up
-					log.Printf("up %s", item.Name)
-				}
-				if down != "" {
-					fi.down = down
-				}
-			}
-			files <- fi
-			if entry.IsDir() {
-				q.PushBack(qItem{Name: name})
-			}
-		}
-		prevName = item.Name
-	}
-	return nil
-}
-
-func safeMode(mode fs.FileMode) bool {
-	return !mode.IsDir() &&
-		!(mode&(fs.ModeDevice|fs.ModeNamedPipe|fs.ModeSocket|fs.ModeIrregular) == 0)
 }
