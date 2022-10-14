@@ -2,6 +2,7 @@ package wire
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -34,49 +35,52 @@ type stepRes struct {
 	Down string
 }
 
-func (w *Walker) Walk2(path string, steps chan<- *WalkStep) {
+func (w *Walker) Walk2(path string, out io.Writer) error {
 	stepRess := make(chan stepRes)
 	go w.walk2(path, stepRess)
 	for res := range stepRess {
 		if res.Up != 0 {
-			steps <- &WalkStep{
-				Step: pb.Step{
-					Step: &pb.Step_Up{
-						Up: &pb.StepPathUp{
-							Up: res.Up,
-						},
+			err := EncodeStep(out, &pb.Step{
+				Step: &pb.Step_Up{
+					Up: &pb.StepPathUp{
+						Up: res.Up,
 					},
 				},
+			})
+			if err != nil {
+				return fmt.Errorf("%s up: %w", res.AbsPath, err)
 			}
 		}
 		if res.Down != "" {
-			steps <- &WalkStep{
-				Step: pb.Step{
-					Step: &pb.Step_Down{
-						Down: &pb.StepPathDown{
-							Down: res.Down,
-						},
+			err := EncodeStep(out, &pb.Step{
+				Step: &pb.Step_Down{
+					Down: &pb.StepPathDown{
+						Down: res.Down,
 					},
 				},
+			})
+			if err != nil {
+				return fmt.Errorf("%s down: %w", res.AbsPath, err)
 			}
 		}
 		if res.File {
-			steps <- &WalkStep{
-				Step: pb.Step{
-					Step: &pb.Step_File{
-						File: &pb.StepFile{
-							Mode:    uint32(res.Mode),
-							Size:    uint64(res.Size),
-							Name:    res.Name,
-							Hash:    res.Hash,
-							HashErr: res.HashErr,
-						},
+			err := EncodeStep(out, &pb.Step{
+				Step: &pb.Step_File{
+					File: &pb.StepFile{
+						Mode:    uint32(res.Mode),
+						Size:    uint64(res.Size),
+						Name:    res.Name,
+						Hash:    res.Hash,
+						HashErr: res.HashErr,
 					},
 				},
-				AbsPath: res.Name,
+			})
+			if err != nil {
+				return fmt.Errorf("%s file: %w", res.AbsPath, err)
 			}
 		}
 	}
+	return nil
 }
 
 func (w *Walker) walk2(path string, stepRess chan<- stepRes) {

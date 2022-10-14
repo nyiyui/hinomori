@@ -60,17 +60,10 @@ func main() {
 	}
 	walker.Block(paths)
 
-	ch := make(chan *wire.WalkStep)
-	go walker.Walk2(root, ch)
 	out := bufio.NewWriter(os.Stdout)
 	_, err = fmt.Fprintf(out, wire.WireMagic)
 	if err != nil {
 		log.Printf("writing magic: %s", err)
 	}
-	for step := range ch {
-		err = wire.EncodeStep(out, &step.Step)
-		if err != nil {
-			log.Printf("%s: %s", step.AbsPath, err)
-		}
-	}
+	walker.Walk2(root, out)
 }
