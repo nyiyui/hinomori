@@ -31,6 +31,8 @@ func jsonPaths(s string) ([]*regexp.Regexp, error) {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
 	var root string
 	var block string
 	var hashAll bool
@@ -65,5 +67,8 @@ func main() {
 	if err != nil {
 		log.Printf("writing magic: %s", err)
 	}
-	walker.Walk2(root, out)
+	err = walker.Walk2(root, out)
+	if err != nil {
+		log.Fatalf("walk: %s", err)
+	}
 }

@@ -80,6 +80,7 @@ func (w *Walker) Walk2(path string, out io.Writer) error {
 			}
 		}
 	}
+	log.Printf("finished stepRess")
 	return nil
 }
 
@@ -93,6 +94,10 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 	var prevName string
 	counter := 0
 	showCounterNext := 1
+	defer func() {
+		log.Printf("qLen: %d", q.Len())
+		log.Printf("counter: %d", counter)
+	}()
 	for q.Len() != 0 {
 		counter++
 		if counter == showCounterNext {

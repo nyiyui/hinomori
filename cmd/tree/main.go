@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +15,8 @@ import (
 )
 
 func main() {
+	flag.Parse()
+
 	var count int
 	stepCh := make(chan *pb.Step)
 	fiCh := make(chan wire.FileInfo2)
@@ -28,17 +32,18 @@ func main() {
 		}
 	}()
 	go func() {
-		for f := range fiCh {
-			fmt.Printf("%11s %8d %16x %s\n", f.Mode, f.Size, f.Hash, filepath.Join(f.Path, f.Name))
-			count++
+		stdin := bufio.NewReader(os.Stdin)
+		err := wire.DecodeSteps(stdin, stepCh)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				log.Printf("read %d files", count)
+				return
+			}
+			log.Fatal(err)
 		}
 	}()
-	err := wire.DecodeSteps(os.Stdin, stepCh)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			log.Printf("read %d files", count)
-			return
-		}
-		log.Fatal(err)
+	for f := range fiCh {
+		fmt.Printf("%11s %8d %16x %s\n", f.Mode, f.Size, f.Hash, filepath.Join(f.Path, f.Name))
+		count++
 	}
 }

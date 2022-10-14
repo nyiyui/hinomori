@@ -3,6 +3,7 @@ package wire
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
@@ -42,24 +43,35 @@ func DecodeSteps(r io.Reader, steps chan<- *pb.Step) error {
 		return errors.New("invalid magic")
 	}
 	for {
-		var lenBytes [8]byte
-		_, err = r.Read(lenBytes[:])
+		step, err := decodeSingle(r)
 		if err != nil {
 			return err
 		}
-		length := binary.LittleEndian.Uint64(lenBytes[:])
-		buf := make([]byte, length)
-		_, err = r.Read(buf)
-		if err != nil {
-			return err
-		}
-		var step pb.Step
-		err = proto.Unmarshal(buf, &step)
-		if err != nil {
-			return err
-		}
-		steps <- &step
+		steps <- step
 	}
+}
+
+func decodeSingle(r io.Reader) (*pb.Step, error) {
+	var lenBytes [8]byte
+	_, err := io.ReadFull(r, lenBytes[:])
+	if err != nil {
+		return nil, fmt.Errorf("read size: %w", err)
+	}
+	size := binary.LittleEndian.Uint64(lenBytes[:])
+	buf := make([]byte, size)
+	n, err := io.ReadFull(r, buf)
+	if err != nil {
+		return nil, fmt.Errorf("read data of size %d: %w", size, err)
+	}
+	if n != int(size) {
+		return nil, fmt.Errorf("underread: want %d got %d", size, n)
+	}
+	var step pb.Step
+	err = proto.Unmarshal(buf, &step)
+	if err != nil {
+		return nil, err
+	}
+	return &step, nil
 }
 
 // ConvertSteps converts a channel of pb.Step into FileInfo2.
