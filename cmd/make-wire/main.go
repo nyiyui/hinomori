@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -46,16 +47,20 @@ func main() {
 		walker.Block(paths2)
 	}
 
-	ch := make(chan wire.WalkStep)
+	ch := make(chan *wire.WalkStep)
 	go func() {
 		err := walker.Walk2(root, ch)
 		if err != nil {
 			log.Fatalf("walk: %s", err)
 		}
 	}()
-	fmt.Fprintf(os.Stdout, wire.WireMagic)
+	out := bufio.NewWriter(os.Stdout)
+	_, err := fmt.Fprintf(out, wire.WireMagic)
+	if err != nil {
+		log.Printf("writing magic: %s", err)
+	}
 	for step := range ch {
-		err := wire.EncodeStep(os.Stdout, &step.Step)
+		err = wire.EncodeStep(out, &step.Step)
 		if err != nil {
 			log.Printf("%s: %s", step.AbsPath, err)
 		}

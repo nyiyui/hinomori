@@ -17,7 +17,7 @@ type WalkStep struct {
 	AbsPath string
 }
 
-func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
+func (w *Walker) Walk2(path string, steps chan<- *WalkStep) error {
 	defer close(steps)
 	var q deque.Deque[qItem]
 	q.PushBack(qItem{Name: path})
@@ -28,8 +28,9 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 		counter++
 		if counter == showCounterNext {
 			log.Printf("progress: %d of current %d", counter, q.Len())
-			showCounterNext *= 2
-			showCounterNext = min(16384, showCounterNext)
+			if showCounterNext < 16384 {
+				showCounterNext *= 2
+			}
 		}
 		item := q.PopFront()
 		entries, err := os.ReadDir(item.Name)
@@ -84,7 +85,7 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 						log.Printf("hash %s: %s", name, hashErr)
 					}
 				}
-				steps <- WalkStep{
+				steps <- &WalkStep{
 					Step: pb.Step{
 						Step: &pb.Step_File{
 							File: &pb.StepFile{
@@ -100,7 +101,7 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 				}
 				if i == 0 {
 					if up != 0 {
-						steps <- WalkStep{
+						steps <- &WalkStep{
 							Step: pb.Step{
 								Step: &pb.Step_Up{
 									Up: &pb.StepPathUp{
@@ -111,7 +112,7 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 						}
 					}
 					if down != "" {
-						steps <- WalkStep{
+						steps <- &WalkStep{
 							Step: pb.Step{
 								Step: &pb.Step_Down{
 									Down: &pb.StepPathDown{
