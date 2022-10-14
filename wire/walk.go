@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/gammazero/deque"
 	"github.com/nyiyui/opt/hinomori/wire/pb"
@@ -80,6 +81,9 @@ func (w *Walker) Walk2(path string, steps chan<- *WalkStep) {
 
 func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 	defer close(stepRess)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	var q deque.Deque[qItem]
 	q.PushBack(qItem{Name: path})
 	var prevName string
@@ -126,8 +130,10 @@ func (w *Walker) walk2(path string, stepRess chan<- stepRes) {
 				q.PushBack(qItem{Name: names[i]})
 			}
 		}
+		wg.Add(len(entries))
 		for i, entry := range entries {
 			go func(i int, entry fs.DirEntry) {
+				defer wg.Done()
 				name := names[i]
 				if name == "" {
 					return
