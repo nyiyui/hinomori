@@ -8,6 +8,8 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/pkg/profile"
+
 	"github.com/nyiyui/opt/hinomori/wire"
 )
 
@@ -15,10 +17,16 @@ func main() {
 	var root string
 	var block string
 	var hash bool
+	var prof bool
 	flag.StringVar(&root, "root", "/", "root of tree")
 	flag.StringVar(&block, "block", "[]", "paths to block in JSON")
 	flag.BoolVar(&hash, "hash", false, "hash all files")
+	flag.BoolVar(&prof, "prof", false, "enable profiling")
 	flag.Parse()
+
+	if prof {
+		defer profile.Start(profile.ProfilePath(".")).Stop()
+	}
 
 	walker := wire.NewWalker()
 	walker.Hash(hash)

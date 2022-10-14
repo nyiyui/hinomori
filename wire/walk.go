@@ -2,7 +2,7 @@ package wire
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,11 +22,19 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 	var q deque.Deque[qItem]
 	q.PushBack(qItem{Name: path})
 	var prevName string
+	counter := 0
+	showCounterNext := 1
 	for q.Len() != 0 {
+		counter++
+		if counter == showCounterNext {
+			log.Printf("progress: %d of current %d", counter, q.Len())
+			showCounterNext *= 2
+			showCounterNext = min(16384, showCounterNext)
+		}
 		item := q.PopFront()
-		entries, err := ioutil.ReadDir(item.Name)
+		entries, err := os.ReadDir(item.Name)
 		if err != nil {
-			return err
+			log.Printf("read %s: %s", item.Name, err)
 		}
 		var up uint32
 		var down string
@@ -43,62 +51,151 @@ func (w *Walker) Walk2(path string, steps chan<- WalkStep) error {
 			down = strings.Join(b[lc:], string(os.PathSeparator))
 			up = uint32(len(a[lc:]))
 		}
+		names := make([]string, len(entries))
 		for i, entry := range entries {
 			name := filepath.Join(item.Name, entry.Name())
 			if w.isBlocked(name) {
 				continue
 			}
-			var hash []byte
-			var hashErr error
-			if w.hash && safeMode(entry.Mode()) {
-				hash, hashErr = w.makeHash(name)
-				if hashErr != nil {
-					log.Printf("hash %s: %s", name, err)
-				}
+			names[i] = name
+			if entry.IsDir() {
+				q.PushBack(qItem{Name: names[i]})
 			}
-			steps <- WalkStep{
-				Step: pb.Step{
-					Step: &pb.Step_File{
-						File: &pb.StepFile{
-							Mode:    uint32(entry.Mode()),
-							Size:    uint64(entry.Size()),
-							Name:    entry.Name(),
-							Hash:    hash,
-							HashErr: fmt.Sprint(hashErr),
+		}
+		for i, entry := range entries {
+			go func(i int, entry fs.DirEntry) {
+				name := names[i]
+				if name == "" {
+					return
+				}
+				info, err := entry.Info()
+				if err != nil {
+					log.Printf("info %s: %s", name, err)
+					return
+				}
+				if !(entry.IsDir() || info.Mode().IsRegular()) {
+					return
+				}
+				var hash []byte
+				var hashErr error
+				if w.hash && safeMode(info.Mode()) {
+					hash, hashErr = w.makeHash(name)
+					if hashErr != nil {
+						log.Printf("hash %s: %s", name, hashErr)
+					}
+				}
+				steps <- WalkStep{
+					Step: pb.Step{
+						Step: &pb.Step_File{
+							File: &pb.StepFile{
+								Mode:    uint32(info.Mode()),
+								Size:    uint64(info.Size()),
+								Name:    entry.Name(),
+								Hash:    hash,
+								HashErr: fmt.Sprint(hashErr),
+							},
 						},
 					},
-				},
-				AbsPath: name,
-			}
-			if i == 0 {
-				if up != 0 {
-					steps <- WalkStep{
-						Step: pb.Step{
-							Step: &pb.Step_Up{
-								Up: &pb.StepPathUp{
-									Up: up,
+					AbsPath: name,
+				}
+				if i == 0 {
+					if up != 0 {
+						steps <- WalkStep{
+							Step: pb.Step{
+								Step: &pb.Step_Up{
+									Up: &pb.StepPathUp{
+										Up: up,
+									},
 								},
 							},
-						},
+						}
 					}
-				}
-				if down != "" {
-					steps <- WalkStep{
-						Step: pb.Step{
-							Step: &pb.Step_Down{
-								Down: &pb.StepPathDown{
-									Down: down,
+					if down != "" {
+						steps <- WalkStep{
+							Step: pb.Step{
+								Step: &pb.Step_Down{
+									Down: &pb.StepPathDown{
+										Down: down,
+									},
 								},
 							},
-						},
+						}
 					}
 				}
-			}
-			if entry.IsDir() {
-				q.PushBack(qItem{Name: name})
-			}
+			}(i, entry)
 		}
 		prevName = item.Name
 	}
 	return nil
+}
+
+type qItem2 struct {
+	Name string
+}
+
+type scanRes struct {
+	Mode    fs.FileMode
+	Size    int64
+	Name    string
+	Hash    []byte
+	HashErr string
+
+	AbsPath string
+}
+
+type walk2ScanState struct {
+	q     chan qItem2
+	steps chan<- scanRes
+}
+
+// TODO: concurrent scan
+
+func (w *Walker) walk2Scan(s *walk2ScanState) {
+	for item := range s.q {
+		/*
+			counter++
+			if counter == showCounterNext {
+				log.Printf("progress: %d of current %d", counter, s.q.Len())
+				showCounterNext *= 2
+				showCounterNext = min(16384, showCounterNext)
+			}
+		*/
+		entries, err := os.ReadDir(item.Name)
+		if err != nil {
+			log.Printf("read %s: %s", item.Name, err)
+		}
+		for _, entry := range entries {
+			name := filepath.Join(item.Name, entry.Name())
+			if w.isBlocked(name) {
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				log.Printf("info %s: %s", name, err)
+				continue
+			}
+			if !(entry.IsDir() || info.Mode().IsRegular()) {
+				continue
+			}
+			var hash []byte
+			var hashErr error
+			if w.hash && safeMode(info.Mode()) {
+				hash, hashErr = w.makeHash(name)
+				if hashErr != nil {
+					log.Printf("hash %s: %s", name, hashErr)
+				}
+			}
+			s.steps <- scanRes{
+				Mode:    info.Mode(),
+				Size:    info.Size(),
+				Name:    entry.Name(),
+				Hash:    hash,
+				HashErr: fmt.Sprint(hashErr),
+				AbsPath: name,
+			}
+			if entry.IsDir() {
+				s.q <- qItem2{Name: name}
+			}
+		}
+	}
 }

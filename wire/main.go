@@ -191,6 +191,10 @@ type qItem struct {
 	Name      string
 }
 
+type qItems struct {
+	Items []qItem
+}
+
 func max[T constraints.Ordered](a, b T) T {
 	if a > b {
 		return a
