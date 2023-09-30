@@ -16,9 +16,9 @@ import (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(CommandLine.Output(), "%s < [wire.hino] > [human-readable tree]\n", os.Args[0])
-		fmt.Fprintf(CommandLine.Output(), "Usage of %s:\n", os.Args[0])
-		PrintDefaults()
+		fmt.Fprintf(flag.CommandLine.Output(), "%s < [wire.hino] > [human-readable tree]\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
 	}
 	flag.Parse()
 
