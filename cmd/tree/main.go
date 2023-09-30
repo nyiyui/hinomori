@@ -15,6 +15,11 @@ import (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(CommandLine.Output(), "%s < [wire.hino] > [human-readable tree]\n", os.Args[0])
+		fmt.Fprintf(CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		PrintDefaults()
+	}
 	flag.Parse()
 
 	var count int
@@ -42,6 +47,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+	log.Printf("waiting for input...")
 	fmt.Printf("%11s %8s %6s %6s %16s %s\n", "mode", "size", "own", "grp", "hash", "path")
 	for f := range fiCh {
 		fmt.Printf("%11s %8d %6d %6d %16x %s\n", f.Mode, f.Size, f.Owner, f.Group, f.Hash, filepath.Join(f.Path, f.Name))
