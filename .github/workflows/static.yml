@@ -37,7 +37,9 @@ jobs:
         with:
           go-version: 1.19
       - name: Build
-        run: go build -v ./cmd/make-wire
+        run: |
+          go build -v ./cmd/make-wire
+          go build -v ./cmd/tree
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
